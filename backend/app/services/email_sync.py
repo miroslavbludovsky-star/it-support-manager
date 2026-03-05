@@ -37,23 +37,28 @@ async def _get_graph_client():
 
 async def _fetch_emails_from_graph(since: datetime | None = None) -> list[dict]:
     """Fetch emails from MS Graph API."""
+    from msgraph.generated.users.item.messages.messages_request_builder import (
+        MessagesRequestBuilder,
+    )
+
     settings = get_settings()
     client, credential = await _get_graph_client()
 
     try:
-        filter_str = ""
+        query_params = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
+            orderby=["receivedDateTime asc"],
+            top=50,
+        )
         if since:
-            filter_str = f"receivedDateTime gt {since.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+            query_params.filter = f"receivedDateTime gt {since.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+
+        request_config = MessagesRequestBuilder.MessagesRequestBuilderGetRequestConfiguration(
+            query_parameters=query_params,
+        )
 
         messages = (
             await client.users.by_user_id(settings.mailbox_user_email)
-            .messages.get(
-                request_configuration=lambda config: setattr(
-                    config.query_parameters, "filter", filter_str
-                )
-                or setattr(config.query_parameters, "orderby", ["receivedDateTime asc"])
-                or setattr(config.query_parameters, "top", 50)
-            )
+            .messages.get(request_configuration=request_config)
         )
 
         results = []
